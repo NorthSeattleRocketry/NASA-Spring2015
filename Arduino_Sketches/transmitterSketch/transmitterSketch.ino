@@ -4,6 +4,13 @@
 #include <TinyGPS.h> //parses GPS data
 #include <SD.h> // for sd card operations
 #include <SPI.h> // for accelerometer
+#include <SPI.h>
+
+#define CSPIN 6
+#define SCALE 0.000723421
+#define SOFTRX 5
+#define SOFTTX 4
+
 
 /*
 Test sketch for transmitting sensor data over xBee radio.
@@ -12,11 +19,13 @@ Transmits data from accelerometer, press/temp sensor, and GPS.
 
 MPL3115A2 ptaSensor; //pressure/temperature sensor
 TinyGPS gps; //gps object
-SoftwareSerial ss(5,4); //RX 5, TX 4
+SoftwareSerial ss(SOFTRX, SOFTTX);
 boolean newData, recording; // flags for new GPS data and SD card, respectively
+double xAcc, yAcc, zAcc;
 
 void setup(){
   pinMode(10, OUTPUT); //required for SD library
+  pinMode(CSPIN, OUTPUT); // accelerometer chip select
   Wire.begin(); //join I2C bus
   Serial.begin(9600); //open serial comms w/radio
   ss.begin(4800); //software serial emulation for GPS
@@ -26,7 +35,6 @@ void setup(){
   ptaSensor.enableEventFlags();
   pinMode(3, OUTPUT); //drives transmission indicator LED
   digitalWrite(3, HIGH);
-  pinMode(6, OUTPUT); //CS pin for accelerometer
   recording = false;
   configureAccel();
   
@@ -46,9 +54,8 @@ void setup(){
 void loop(){
   newData = false;
   
-  //get X acceleration from new accelerometer
-  Serial.print("New X ACCELRERATION:");
-  Serial.println(getXAccel());
+  //get acceleration from accelerometer
+  getAccel();
   
   // get GPS data
   for (unsigned long start = millis(); millis() - start < 150;)
@@ -135,11 +142,11 @@ void loop(){
   Serial.print(",ALTI:");
   Serial.print(ptaSensor.readAltitude(), 2);
   Serial.print(",XACC:");
-  Serial.print(analogRead(0));
+  Serial.print(xAcc);
   Serial.print(",YACC:");
-  Serial.print(analogRead(1));
+  Serial.print(yAcc);
   Serial.print(",ZACC:");
-  Serial.print(analogRead(2));
+  Serial.print(zAcc);
   Serial.print("&\n");
   }
 
@@ -158,11 +165,11 @@ void loop(){
       dataFile.write(",ALTI:");
       dataFile.print(ptaSensor.readAltitude(), 2);
       dataFile.write(",XACC:");
-      dataFile.print(analogRead(0));
+      dataFile.print(xAcc);
       dataFile.write(",YACC:");
-      dataFile.print(analogRead(1));
+      dataFile.print(yAcc);
       dataFile.write(",ZACC");
-      dataFile.print(analogRead(2));
+      dataFile.print(zAcc);
       dataFile.println(",&");
       dataFile.close();
       Serial.println("SD write");
@@ -179,39 +186,59 @@ void loop(){
   }**/
 
 void configureAccel(){
+  // configure SPI bus
   SPI.begin();
-  digitalWrite(6, LOW); //address accelerometer
-  SPI.setDataMode(SPI_MODE3); // set clock polarity and phase
+  SPI.setDataMode(SPI_MODE0); // set clock polarity and phase
   SPI.setBitOrder(MSBFIRST);
+  SPI.setClockDivider(SPI_CLOCK_DIV16); // set clock timing
   
-  //write access,do not advance address automatically, CTRL_REG1
-  SPI.transfer(32); // 00100000b
-  //normal power, data rate, enable x y z axes 
-  SPI.transfer(39); // 00100111b
-  digitalWrite(6, HIGH); // deselect accelerometer
-  SPI.end();
+  // configure CTRL_REG1
+  byte address = B00100000;
+  //settings bits: 0-2: power mode; 3-4: data rate; 5-7: enable x y z axes
+  byte settings = B00111111;
+  digitalWrite(CSPIN, LOW); //address accelerometer
+  delay(1);
+  SPI.transfer(address); // get write access to address of CTRL_REG1
+  SPI.transfer(settings);
+  delay(1);
+  digitalWrite(CSPIN, HIGH); // deselect accelerometer
+  delay(100);
+
+  // configure CTRL_REG4
+  address = B00100011; // get write access to address of CTRL_REG4
+  settings = B00110000; // select 24g scale
+  digitalWrite(CSPIN,LOW);
+  delay(1);
+  SPI.transfer(address);
+  SPI.transfer(settings);
+  delay(1);
+  digitalWrite(CSPIN, HIGH);
+
 }
 
-int getXAccel(){
-  SPI.begin();
-  digitalWrite(6, LOW); //address accelerometer
-  SPI.setDataMode(SPI_MODE3); // set clock polarity and phase
-  SPI.setBitOrder(MSBFIRST);
+void getAccel(){
+  byte lowXAddress = B11101000;
+  byte empty = B00000000; //empty byte to advance register
+  digitalWrite(CSPIN, LOW); //address accelerometer
   
-  SPI.transfer(168); //10101000b get read access to OUT_X_L 
-  byte xLow = SPI.transfer(0); //send 0 to advance clock and get low x data
-  
-  digitalWrite(6, HIGH); //reset accel for new address
   delay(1);
-  digitalWrite(6, LOW);
-  SPI.transfer(169); //10101001b get read access to OUT_X_H
-  byte xHigh = SPI.transfer(0); //send 0 to advance clock and get high x data
-  digitalWrite(6, HIGH);
+  SPI.transfer(lowXAddress); //get read access to OUT_X_L 
+  byte xLow = SPI.transfer(empty); //send 0 to advance clock and get low x data
+  byte xHigh = SPI.transfer(empty);
+  byte yLow = SPI.transfer(empty);
+  byte yHigh = SPI.transfer(empty);
+  byte zLow = SPI.transfer(empty);
+  byte zHigh = SPI.transfer(empty);
+  delay(1);
   
-  int w = xHigh << 8 | xLow;
-  return w;
+  digitalWrite(CSPIN, HIGH);
+
+  int xVal = (xLow | xHigh << 8);
+  int yVal = (yLow | yHigh << 8);
+  int zVal = (zLow | zHigh << 8);
+  xAcc =  xVal * SCALE;
+  yAcc =  yVal * SCALE;
+  zAcc =  zVal * SCALE;
 }
-  
-  
-  
+
 
