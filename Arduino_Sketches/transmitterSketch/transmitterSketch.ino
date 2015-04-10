@@ -4,7 +4,6 @@
 #include <TinyGPS.h> //parses GPS data
 #include <SD.h> // for sd card operations
 #include <SPI.h> // for accelerometer
-#include <SPI.h>
 
 #define CSPIN 6
 #define SCALE 0.000723421
@@ -40,11 +39,11 @@ void setup(){
   
   // initialize SD card
   if(!SD.begin(8)){
-    Serial.println("DEBUG,MSG:Could not initialize card&");
+    Serial.print("DEBUG,MSG:Could not initialize card&\n");
     recording = false;
   }
   else{
-    Serial.println("DEBUG,MSG:Card Initialized&");
+    Serial.print("DEBUG,MSG:Card Initialized&\n");
     recording = true;
   }
   
@@ -91,7 +90,7 @@ void loop(){
     Serial.print(flat == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flat, 6);
     Serial.print(",LON:");
     Serial.print(flon == TinyGPS::GPS_INVALID_F_ANGLE ? 0.0 : flon, 6);
-    Serial.println("&");
+    Serial.print("&\n");
 
     // write to SD card
     File dataFile = SD.open("packets.txt", FILE_WRITE);
@@ -127,9 +126,9 @@ void loop(){
   Serial.print(sentences);
   Serial.print(",ERR:");
   Serial.print(failed);
-  Serial.println("&");
+  Serial.print("&\n");
   if (chars == 0){
-    Serial.println("DEBUG,MSG:No characters received from GPS&");
+    Serial.print("DEBUG,MSG:No characters received from GPS&\n");
   }
   }
   
@@ -140,7 +139,7 @@ void loop(){
   Serial.print(",TEMP:");
   Serial.print(ptaSensor.readTempF(), 2);
   Serial.print(",ALTI:");
-  Serial.print(ptaSensor.readAltitude(), 2);
+  Serial.print(ptaSensor.readAltitudeFt(), 2);
   Serial.print(",XACC:");
   Serial.print(xAcc);
   Serial.print(",YACC:");
@@ -163,7 +162,7 @@ void loop(){
       dataFile.write(",TEMP:");
       dataFile.print(ptaSensor.readTempF(), 2);
       dataFile.write(",ALTI:");
-      dataFile.print(ptaSensor.readAltitude(), 2);
+      dataFile.print(ptaSensor.readAltitudeFt(), 2);
       dataFile.write(",XACC:");
       dataFile.print(xAcc);
       dataFile.write(",YACC:");
