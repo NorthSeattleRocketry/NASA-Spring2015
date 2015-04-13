@@ -7,6 +7,6 @@ void setup(){
 
 void loop(){
   while(Serial.available() > 0){
-    Serial.println(Serial.readStringUntil('&') + "&");
+    Serial.print(Serial.readStringUntil('&') + "&");
   }
 }

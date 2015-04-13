@@ -25,17 +25,13 @@ double xAcc, yAcc, zAcc;
 void setup(){
   pinMode(10, OUTPUT); //required for SD library
   pinMode(CSPIN, OUTPUT); // accelerometer chip select
-  Wire.begin(); //join I2C bus
   Serial.begin(9600); //open serial comms w/radio
+  configureAltimeter();  //configure MPL315A2 temp/alt sensor
   ss.begin(4800); //software serial emulation for GPS
-  ptaSensor.begin(); // start pressure/temp monitoring
-  ptaSensor.setModeAltimeter(); // set p/t sensor to altitude mode
-  ptaSensor.setOversampleRate(7);
-  ptaSensor.enableEventFlags();
   pinMode(3, OUTPUT); //drives transmission indicator LED
   digitalWrite(3, HIGH);
   recording = false;
-  configureAccel();
+  configureAccel(); //configure LIS331 accelerometer
   
   // initialize SD card
   if(!SD.begin(8)){
@@ -53,8 +49,13 @@ void setup(){
 void loop(){
   newData = false;
   
-  //get acceleration from accelerometer
-  getAccel();
+  // get 3 rounds of temp/press/accel data for 
+  // every round of GPS data. Due to slowness of GPS
+  for(uint8_t i = 0; i < 4; i++){
+    getAccel();
+    transmitData();
+    writeData();
+  }
   
   // get GPS data
   for (unsigned long start = millis(); millis() - start < 150;)
@@ -75,8 +76,8 @@ void loop(){
   digitalWrite(3, LOW); //turn off LED
 }
 
-  // send GPS data
-  void transmitAndWriteGPSData(){
+// send GPS data
+void transmitAndWriteGPSData(){
   if (newData){
     float flat, flon;
     unsigned long age;
@@ -106,18 +107,19 @@ void loop(){
       dataFile.println("&");
       dataFile.close();
       }
-      else{
-        Serial.println("DEBUG,MSG:Error opening SD file&");
-      }
+    else{
+      Serial.print("DEBUG,MSG:Error opening SD file&\n");
     }
-   }
+  }
+}
   
   
   // send GPS statistics
-  void transmitGPSDebug(){
+void transmitGPSDebug(){
   unsigned long chars;
   unsigned short sentences, failed;
   gps.stats(&chars, &sentences, &failed);
+  
   Serial.print("DEBUG,TIME:");
   Serial.print(millis() / 1000.0);
   Serial.print(",CHARS:");
@@ -127,12 +129,13 @@ void loop(){
   Serial.print(",ERR:");
   Serial.print(failed);
   Serial.print("&\n");
+  
   if (chars == 0){
     Serial.print("DEBUG,MSG:No characters received from GPS&\n");
   }
-  }
+}
   
-  void transmitData(){
+void transmitData(){
   // send press/temp/accel data
   Serial.print("DATA,TIME:");
   Serial.print(millis() / 1000.0);
@@ -142,18 +145,19 @@ void loop(){
   Serial.print(ptaSensor.readAltitudeFt(), 2);
   Serial.print(",XACC:");
   Serial.print(xAcc);
-  Serial.print(",YACC:");
-  Serial.print(yAcc);
+  // Z and Y coordinates switched to reflect actual 
+  //   physical orientation of device                
   Serial.print(",ZACC:");
+  Serial.print(yAcc);
+  Serial.print(",YACC:");
   Serial.print(zAcc);
   Serial.print("&\n");
-  }
+}
 
 
   
   // write to SD card if recording
-  void writeData(){
-//  if(abs(temperature + alti + xAcc + yAcc + zAcc - lastPacketValue) > 5 && recording){
+void writeData(){
   if(recording){
     File dataFile = SD.open("packets.txt", FILE_WRITE);
     if(dataFile){
@@ -169,20 +173,24 @@ void loop(){
       dataFile.print(yAcc);
       dataFile.write(",ZACC");
       dataFile.print(zAcc);
-      dataFile.println(",&");
+      dataFile.println("&");
       dataFile.close();
-      Serial.println("SD write");
-
+      Serial.print("DEBUG,MSG:Write to SD card&\n");
     }
     else{
-      Serial.println("DEBUG,MSG:Error opening SD file&");
+      Serial.print("DEBUG,MSG:Error opening SD file&\n");
     }
   }
 }
-  /**
-  else if(recording){
-    Serial.println("Duplicate packet - not recorded to SD");
-  }**/
+
+void configureAltimeter(){
+  ptaSensor.begin();
+  ptaSensor.setModeStandby();
+  ptaSensor.enableEventFlags();
+  ptaSensor.setModeAltimeter();
+  ptaSensor.setOversampleRate(7);
+  ptaSensor.setModeActive();
+}
 
 void configureAccel(){
   // configure SPI bus
