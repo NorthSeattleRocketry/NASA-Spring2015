@@ -1,0 +1,19 @@
+    PARTS LIST
+--------------------
+*Links contain ordering info, datasheets, and product manuals
+
+TRANSMITTER
+--------------------
+LIS331 Accelerometer       - https://www.sparkfun.com/products/10345
+EM-506 GPS Receiver        - https://www.sparkfun.com/products/12751
+MPL5115A2 Temp / Altimeter - https://www.sparkfun.com/products/11084
+Redboard Microcontroller   - https://www.sparkfun.com/products/12757
+Redboard SD card shield    - https://www.sparkfun.com/products/12761
+Xbee Explorer Breakout     - https://www.sparkfun.com/products/11373
+Xbee Pro 900 Radio         - https://www.sparkfun.com/products/9099
+
+RECEIVER
+--------------------
+Redboard Microcontroller   - https://www.sparkfun.com/products/12757
+Xbee Pro 900 Radio         - https://www.sparkfun.com/products/9099
+Xbee Explorer USB Breakout - https://www.sparkfun.com/products/11812
